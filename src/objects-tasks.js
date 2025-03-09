@@ -167,8 +167,34 @@ function makeWord(lettersObject) {
  *    sellTickets([25, 25, 50]) => true
  *    sellTickets([25, 100]) => false (The seller does not have enough money to give change.)
  */
-function sellTickets(/* queue */) {
-  throw new Error('Not implemented');
+function sellTickets(queue) {
+  const result = queue.reduce(
+    (acc, bill) => {
+      if (!acc.canSell) return acc;
+
+      if (bill === 25) {
+        acc.count25 += 1;
+      } else if (bill === 50) {
+        if (acc.count25 > 0) {
+          acc.count25 -= 1;
+          acc.count50 += 1;
+        } else {
+          acc.canSell = false;
+        }
+      } else if (acc.count50 > 0 && acc.count25 > 0) {
+        acc.count50 -= 1;
+        acc.count25 -= 1;
+      } else if (acc.count25 >= 3) {
+        acc.count25 -= 3;
+      } else {
+        acc.canSell = false;
+      }
+      return acc;
+    },
+    { count25: 0, count50: 0, canSell: true }
+  );
+
+  return result.canSell;
 }
 
 /**
@@ -248,8 +274,15 @@ function fromJSON(proto, json) {
  *      { country: 'Russia',  city: 'Saint Petersburg' }
  *    ]
  */
-function sortCitiesArray(/* arr */) {
-  throw new Error('Not implemented');
+function sortCitiesArray(arr) {
+  return arr.sort((a, b) => {
+    if (a.country < b.country) return -1;
+    if (a.country > b.country) return 1;
+
+    if (a.city < b.city) return -1;
+    if (a.city > b.city) return 1;
+    return 0;
+  });
 }
 
 /**
@@ -282,8 +315,18 @@ function sortCitiesArray(/* arr */) {
  *    "Poland" => ["Lodz"]
  *   }
  */
-function group(/* array, keySelector, valueSelector */) {
-  throw new Error('Not implemented');
+function group(array, keySelector, valueSelector) {
+  const result = new Map();
+  array.forEach((item) => {
+    const key = keySelector(item);
+    const value = valueSelector(item);
+
+    if (!result.has(key)) {
+      result.set(key, []);
+    }
+    result.get(key).push(value);
+  });
+  return result;
 }
 
 /**
@@ -341,32 +384,73 @@ function group(/* array, keySelector, valueSelector */) {
  */
 
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  currentSelector: '',
+  currentOrder: 0,
+  currentSelectorType: '',
+
+  stringify() {
+    const { currentSelector } = this;
+    this.currentSelector = '';
+    return currentSelector;
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  checkSelectorOrder(object) {
+    if (
+      this.currentOrder === object.currentOrder &&
+      ['element', 'id', 'pseudoElement'].includes(object.currentSelectorType)
+    ) {
+      throw new Error(
+        'Element, id and pseudo-element should not occur more then one time inside the selector'
+      );
+    }
+    if (this.currentOrder > object.currentOrder) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element'
+      );
+    }
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  createSelector(type, value, order, prefix = '') {
+    const cssSelector = Object.assign(Object.create(cssSelectorBuilder), {
+      currentSelector: `${this.currentSelector}${prefix}${value}${
+        type === 'attr' ? ']' : ''
+      }`,
+      currentOrder: order,
+      currentSelectorType: type,
+    });
+
+    this.checkSelectorOrder(cssSelector);
+    return cssSelector;
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  element(value) {
+    return this.createSelector('element', value, 1);
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    return this.createSelector('id', value, 2, '#');
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    return this.createSelector('class', value, 3, '.');
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    return this.createSelector('attr', value, 4, '[');
+  },
+
+  pseudoClass(value) {
+    return this.createSelector('pseudoClass', value, 5, ':');
+  },
+
+  pseudoElement(value) {
+    return this.createSelector('pseudoElement', value, 6, '::');
+  },
+
+  combine(selector1, combinator, selector2) {
+    const cssSelector = Object.create(cssSelectorBuilder);
+    cssSelector.currentSelector = `${selector1.currentSelector} ${combinator} ${selector2.currentSelector}`;
+    return cssSelector;
   },
 };
 
